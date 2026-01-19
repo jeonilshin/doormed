@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Doormedexpress - Your Health, Delivered. Hassle-Free.',
+  title: 'DoorMed Express - Your Health, Delivered. Hassle-Free.',
   description: 'Subscription-based online pharmacy delivering maintenance medications and supplements directly to your door.',
 }
 
