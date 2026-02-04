@@ -348,7 +348,7 @@ export default function Home() {
                 <br />
                 Re-Purchase Your
                 <br />
-                Meds Shouldn't Happen
+                Meds Shouldn&apos;t Happen
               </h2>
               <p className="mt-8 text-[#1b4332]/70 text-lg leading-relaxed max-w-md">
                 Managing chronic conditions like hypertension and high cholesterol requires consistency. Missing doses because you forgot to refill your prescription can impact your health. DoorMedExpress ensures you never run out.
