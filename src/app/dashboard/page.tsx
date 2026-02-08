@@ -8,7 +8,6 @@ import {
   Users,
   User,
   MessageSquare,
-  Bell,
   Menu,
   X,
   Calendar,
@@ -18,6 +17,7 @@ import {
   LogOut,
   Shield
 } from 'lucide-react'
+import NotificationBell from '@/components/NotificationBell'
 
 export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -25,17 +25,12 @@ export default function Dashboard() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [dashboardData, setDashboardData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [showOnboardingPrompt, setShowOnboardingPrompt] = useState(false)
 
   useEffect(() => {
     fetchUserData()
     fetchDashboardData()
-    
-    // Auto-refresh dashboard data every 10 seconds
-    const interval = setInterval(() => {
-      fetchDashboardData()
-    }, 10000)
-    
-    return () => clearInterval(interval)
+    // Removed auto-refresh for better performance
   }, [])
 
   const fetchUserData = async () => {
@@ -67,6 +62,11 @@ export default function Dashboard() {
       if (response.ok) {
         const data = await response.json()
         setDashboardData(data)
+        
+        // Check if user has active subscriptions
+        if (data.activeSubscriptions.length === 0 && user && !user.onboardingComplete) {
+          setShowOnboardingPrompt(true)
+        }
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
@@ -226,10 +226,7 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition">
-              <Bell className="h-6 w-6" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
+            <NotificationBell />
           </div>
         </header>
 
@@ -241,6 +238,40 @@ export default function Dashboard() {
             </div>
           ) : (
             <>
+              {/* Onboarding Prompt Banner */}
+              {showOnboardingPrompt && (
+                <div className="bg-gradient-to-r from-[#1b4332] to-[#2d5a45] rounded-2xl p-6 text-white">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-serif italic mb-2">Complete Your Personalized Medication Schedule</h3>
+                      <p className="text-white/80 mb-4">
+                        Set up your personalized medication schedule and dosing to never miss a dose. Get customized reminders and track your adherence.
+                      </p>
+                      <div className="flex gap-3">
+                        <a
+                          href="/onboarding?step=1"
+                          className="bg-[#c9e265] text-[#1b4332] px-6 py-3 rounded-xl font-medium hover:bg-[#d4ed70] transition"
+                        >
+                          Complete Onboarding
+                        </a>
+                        <button
+                          onClick={() => setShowOnboardingPrompt(false)}
+                          className="bg-white/10 text-white px-6 py-3 rounded-xl font-medium hover:bg-white/20 transition"
+                        >
+                          Maybe Later
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowOnboardingPrompt(false)}
+                      className="text-white/60 hover:text-white ml-4"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {stats.map((stat) => (

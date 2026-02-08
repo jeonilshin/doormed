@@ -14,10 +14,8 @@ export async function POST(request: NextRequest) {
     // Check for both admin token and rider token
     const adminToken = request.cookies.get('token')?.value
     const riderToken = request.cookies.get('rider_token')?.value
-    
-    const token = adminToken || riderToken
 
-    if (!token) {
+    if (!adminToken && !riderToken) {
       return NextResponse.json(
         { error: 'Not authenticated' },
         { status: 401 }

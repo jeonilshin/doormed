@@ -24,13 +24,7 @@ export default function NotificationBell() {
 
   useEffect(() => {
     fetchNotifications()
-    
-    // Poll for new notifications every 30 seconds (reduced from 15)
-    const interval = setInterval(() => {
-      fetchNotifications()
-    }, 30000)
-    
-    return () => clearInterval(interval)
+    // Removed auto-refresh - user can manually refresh if needed
   }, [])
 
   // Close dropdown when clicking outside

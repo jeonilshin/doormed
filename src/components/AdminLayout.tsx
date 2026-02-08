@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   LayoutDashboard,
   Users,
@@ -19,11 +19,30 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0)
+
+  useEffect(() => {
+    fetchPendingOrders()
+    // Removed auto-refresh for better performance
+  }, [])
+
+  const fetchPendingOrders = async () => {
+    try {
+      const response = await fetch('/api/admin/orders?archived=false')
+      if (response.ok) {
+        const data = await response.json()
+        const pending = data.orders.filter((order: any) => order.status === 'pending').length
+        setPendingOrdersCount(pending)
+      }
+    } catch (error) {
+      console.error('Error fetching pending orders:', error)
+    }
+  }
 
   const navigation = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
     { name: 'Users', href: '/admin/users', icon: Users },
-    { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
+    { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, badge: pendingOrdersCount },
     { name: 'Riders', href: '/admin/riders', icon: Truck },
     { name: 'Inventory', href: '/admin/inventory', icon: Package },
     { name: 'Support', href: '/admin/support', icon: MessageSquare },
@@ -78,7 +97,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <a
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg transition relative ${
                     isActive
                       ? 'bg-[#c9e265] text-[#1b4332]'
                       : 'text-white/70 hover:bg-white/10 hover:text-white'
@@ -86,6 +105,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 >
                   <item.icon className="h-5 w-5" />
                   <span className="font-medium">{item.name}</span>
+                  {item.badge && item.badge > 0 && (
+                    <span className="absolute right-3 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                      {item.badge > 9 ? '9+' : item.badge}
+                    </span>
+                  )}
                 </a>
               )
             })}

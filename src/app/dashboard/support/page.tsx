@@ -15,13 +15,7 @@ export default function Support() {
 
   useEffect(() => {
     fetchMessages()
-    
-    // Poll for new messages every 5 seconds
-    const interval = setInterval(() => {
-      fetchMessages()
-    }, 5000)
-    
-    return () => clearInterval(interval)
+    // Removed auto-refresh for better performance
   }, [])
 
   useEffect(() => {

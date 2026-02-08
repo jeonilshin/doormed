@@ -55,6 +55,7 @@ export default function InventoryManagement() {
   useEffect(() => {
     checkAdminAuth()
     fetchInventory()
+    // Removed auto-refresh for better performance
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

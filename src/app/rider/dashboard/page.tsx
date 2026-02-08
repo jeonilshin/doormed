@@ -50,27 +50,11 @@ export default function RiderDashboard() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [deliveryPhoto, setDeliveryPhoto] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [refreshTimer, setRefreshTimer] = useState(15)
 
   useEffect(() => {
     fetchRiderData()
     fetchAssignedOrders()
-    
-    // Auto-refresh every 15 seconds (reduced from 5)
-    const interval = setInterval(() => {
-      fetchAssignedOrders()
-      setRefreshTimer(15)
-    }, 15000)
-    
-    // Countdown timer
-    const timerInterval = setInterval(() => {
-      setRefreshTimer((prev) => (prev > 0 ? prev - 1 : 15))
-    }, 1000)
-    
-    return () => {
-      clearInterval(interval)
-      clearInterval(timerInterval)
-    }
+    // Removed auto-refresh for better performance
   }, [])
 
   const fetchRiderData = async () => {
@@ -91,7 +75,6 @@ export default function RiderDashboard() {
       if (response.ok) {
         const data = await response.json()
         setOrders(data.orders)
-        setRefreshTimer(15) // Reset timer on manual refresh
       }
     } catch (error) {
       console.error('Error fetching orders:', error)
@@ -227,10 +210,6 @@ export default function RiderDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Clock className="h-4 w-4" />
-                <span>Auto-refresh in {refreshTimer}s</span>
-              </div>
               <button
                 onClick={fetchAssignedOrders}
                 className="flex items-center gap-2 px-4 py-2 bg-[#1b4332] text-[#c9e265] rounded-lg hover:bg-[#143528] transition"

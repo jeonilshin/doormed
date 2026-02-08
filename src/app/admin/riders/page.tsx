@@ -41,13 +41,7 @@ export default function RidersManagement() {
   useEffect(() => {
     checkAdminAuth()
     fetchRiders()
-    
-    // Auto-refresh every 30 seconds (reduced from 10)
-    const interval = setInterval(() => {
-      fetchRiders()
-    }, 30000)
-    
-    return () => clearInterval(interval)
+    // Removed auto-refresh for better performance
   }, [])
 
   const checkAdminAuth = async () => {

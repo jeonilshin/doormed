@@ -84,17 +84,11 @@ export default function OrdersManagement() {
 
   useEffect(() => {
     checkAdminAuth()
-    setLoading(true) // Set loading when tab changes
-    setOrders([]) // Clear orders immediately when switching tabs
+    setLoading(true)
+    setOrders([])
     fetchOrders()
     fetchRiders()
-    
-    // Auto-refresh every 30 seconds (reduced from 10)
-    const interval = setInterval(() => {
-      fetchOrders()
-    }, 30000)
-    
-    return () => clearInterval(interval)
+    // Removed auto-refresh for better performance
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewArchived])
 
@@ -306,6 +300,7 @@ export default function OrdersManagement() {
       confirm: 'confirm this order',
       prepare: 'start preparing this order',
       ready: 'mark this order as ready',
+      reject: 'reject this order',
       'confirm-delivery': 'confirm delivery'
     }
 
@@ -334,6 +329,7 @@ export default function OrdersManagement() {
               confirm: 'Order confirmed! Customer has been notified.',
               prepare: 'Order marked as preparing.',
               ready: 'Order marked as ready! Customer has been notified.',
+              reject: 'Order rejected! Customer has been notified.',
               'confirm-delivery': 'Delivery confirmed! Customer has been notified.'
             }
             
@@ -389,6 +385,7 @@ export default function OrdersManagement() {
     const actions = []
     if (status === 'pending') {
       actions.push({ action: 'confirm', label: 'Confirm Order', color: 'bg-blue-600 hover:bg-blue-700' })
+      actions.push({ action: 'reject', label: 'Reject Order', color: 'bg-red-600 hover:bg-red-700' })
     }
     if (status === 'confirmed') {
       actions.push({ action: 'prepare', label: 'Start Preparing', color: 'bg-purple-600 hover:bg-purple-700' })

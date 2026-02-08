@@ -9,7 +9,8 @@ import {
   FileText,
   CheckCircle2,
   Upload,
-  AlertCircle
+  AlertCircle,
+  Pill
 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { philippineProvinces, getCitiesByProvince, getBarangaysByCity } from '@/lib/ph-locations'
@@ -43,6 +44,7 @@ export default function Onboarding() {
   const [analyzing, setAnalyzing] = useState(false)
   const [recommendations, setRecommendations] = useState<any>(null)
   const [analysisComplete, setAnalysisComplete] = useState(false)
+  const [medicationSchedules, setMedicationSchedules] = useState<any[]>([]) // For step 5
 
   // Cascading dropdown states
   const [availableCities, setAvailableCities] = useState<string[]>([])
@@ -70,7 +72,7 @@ export default function Onboarding() {
     }
   }, [formData.city, formData.province])
 
-  const totalSteps = 5 // Added analysis and recommendations steps
+  const totalSteps = 6 // Added medication schedule step
 
   const conditions = [
     'Hypertension',
@@ -116,8 +118,11 @@ export default function Onboarding() {
         await analyzeHealthData()
         return
       } else if (step === 4) {
-        // Move to recommendations after analysis
+        // Move to medication schedule customization after analysis
         await loadRecommendations()
+      } else if (step === 5) {
+        // Save medication schedules before showing final recommendations
+        // Schedules are already in medicationSchedules state
       }
       setStep(step + 1)
     } else {
@@ -125,7 +130,7 @@ export default function Onboarding() {
       await fetch('/api/onboarding/update-step', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ step: 5 })
+        body: JSON.stringify({ step: 6 })
       })
       window.location.href = '/shop'
     }
@@ -150,6 +155,20 @@ export default function Onboarding() {
       if (response.ok) {
         const data = await response.json()
         setRecommendations(data)
+        
+        // Initialize medication schedules with recommendations
+        const allMeds = [
+          ...(data.medications || []),
+          ...(data.supplements || [])
+        ]
+        setMedicationSchedules(allMeds.map((med: any) => ({
+          ...med,
+          selected: true, // All selected by default
+          customDosage: med.dosage,
+          customFrequency: med.frequency || 'once daily',
+          customTimes: med.times || ['8:00 AM'],
+          customInstructions: med.instructions || ''
+        })))
       }
     } catch (error) {
       console.error('Error loading recommendations:', error)
@@ -181,22 +200,28 @@ export default function Onboarding() {
   const handleSubscribePackage = async () => {
     if (!recommendations?.package) return
 
-    // Add package to cart as subscription
-    const subscriptionItem = {
+    // Get selected medications with their custom schedules
+    const selectedMedications = medicationSchedules.filter(m => m.selected)
+
+    // Create subscription with medication schedules
+    const subscriptionData = {
       type: 'subscription',
       packageId: recommendations.package.id || 'package-1',
-      name: recommendations.package.name,
+      name: 'Personalized Medication Schedule & Dosing',
       price: recommendations.package.finalPrice,
       frequency: 30,
-      items: recommendations.package.items.map((item: any) => ({
-        medicationId: item.id,
-        name: item.name,
-        quantity: item.quantity || 1,
-        price: item.price
+      items: selectedMedications.map((med: any) => ({
+        medicationId: med.id,
+        name: med.name,
+        dosage: med.customDosage,
+        frequency: med.customFrequency,
+        times: med.customTimes,
+        instructions: med.customInstructions,
+        price: med.price
       }))
     }
 
-    localStorage.setItem('cart', JSON.stringify([subscriptionItem]))
+    localStorage.setItem('cart', JSON.stringify([subscriptionData]))
     
     // Mark onboarding as complete
     try {
@@ -205,7 +230,8 @@ export default function Onboarding() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          onboardingComplete: true
+          onboardingComplete: true,
+          medicationSchedules: selectedMedications
         })
       })
     } catch (error) {
@@ -682,8 +708,145 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* Step 5: Recommendations */}
+        {/* Step 5: Medication Schedule Customization */}
         {step === 5 && (
+          <div className="bg-white rounded-2xl p-8 border border-gray-200">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-[#c9e265] rounded-xl flex items-center justify-center">
+                <Pill className="h-6 w-6 text-[#1b4332]" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-serif italic text-[#1b4332]">Personalized Medication Schedule</h2>
+                <p className="text-gray-600">Customize your dosage, frequency, and timing</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {medicationSchedules.map((med, index) => (
+                <div key={med.id} className="border border-gray-200 rounded-xl p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start gap-3 flex-1">
+                      <input
+                        type="checkbox"
+                        checked={med.selected}
+                        onChange={(e) => {
+                          const updated = [...medicationSchedules]
+                          updated[index].selected = e.target.checked
+                          setMedicationSchedules(updated)
+                        }}
+                        className="w-5 h-5 text-[#1b4332] rounded mt-1"
+                      />
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-900 text-lg">{med.name}</h3>
+                        <p className="text-sm text-gray-600">{med.category}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {med.selected && (
+                    <div className="ml-8 space-y-4 pt-4 border-t">
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Dosage</label>
+                          <input
+                            type="text"
+                            value={med.customDosage}
+                            onChange={(e) => {
+                              const updated = [...medicationSchedules]
+                              updated[index].customDosage = e.target.value
+                              setMedicationSchedules(updated)
+                            }}
+                            placeholder="e.g., 1 tablet, 10mg"
+                            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1b4332]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Frequency</label>
+                          <select
+                            value={med.customFrequency}
+                            onChange={(e) => {
+                              const updated = [...medicationSchedules]
+                              updated[index].customFrequency = e.target.value
+                              // Update times based on frequency
+                              if (e.target.value === 'once daily') {
+                                updated[index].customTimes = ['8:00 AM']
+                              } else if (e.target.value === 'twice daily') {
+                                updated[index].customTimes = ['8:00 AM', '8:00 PM']
+                              } else if (e.target.value === 'three times daily') {
+                                updated[index].customTimes = ['8:00 AM', '2:00 PM', '8:00 PM']
+                              }
+                              setMedicationSchedules(updated)
+                            }}
+                            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1b4332]"
+                          >
+                            <option value="once daily">Once daily</option>
+                            <option value="twice daily">Twice daily</option>
+                            <option value="three times daily">Three times daily</option>
+                            <option value="as needed">As needed</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Specific Times {med.customFrequency !== 'as needed' && `(${med.customTimes.length} times)`}
+                        </label>
+                        {med.customFrequency !== 'as needed' && (
+                          <div className="grid md:grid-cols-3 gap-3">
+                            {med.customTimes.map((time: string, timeIndex: number) => (
+                              <input
+                                key={timeIndex}
+                                type="time"
+                                value={time}
+                                onChange={(e) => {
+                                  const updated = [...medicationSchedules]
+                                  updated[index].customTimes[timeIndex] = e.target.value
+                                  setMedicationSchedules(updated)
+                                }}
+                                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1b4332]"
+                              />
+                            ))}
+                          </div>
+                        )}
+                        {med.customFrequency === 'as needed' && (
+                          <p className="text-sm text-gray-500 italic">Take as needed based on symptoms</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Special Instructions (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={med.customInstructions}
+                          onChange={(e) => {
+                            const updated = [...medicationSchedules]
+                            updated[index].customInstructions = e.target.value
+                            setMedicationSchedules(updated)
+                          }}
+                          placeholder="e.g., with food, before sleep, on empty stomach"
+                          className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1b4332]"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex gap-3">
+                <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-medium mb-1">Personalized Schedule</p>
+                  <p>This schedule will help you track your medications and ensure you never miss a dose. You can always adjust it later from your dashboard.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 6: Final Recommendations */}
+        {step === 6 && (
           <div className="space-y-6">
             {/* Subscription Package */}
             {recommendations?.package && (
@@ -693,7 +856,7 @@ export default function Onboarding() {
                     <div className="inline-block bg-[#c9e265] text-[#1b4332] px-3 py-1 rounded-full text-sm font-medium mb-3">
                       Recommended Package
                     </div>
-                    <h2 className="text-3xl font-serif italic mb-2">{recommendations.package.name}</h2>
+                    <h2 className="text-3xl font-serif italic mb-2">Personalized Medication Schedule & Dosing</h2>
                     <p className="text-[#c9e265] opacity-90">{recommendations.package.description}</p>
                   </div>
                 </div>
@@ -851,7 +1014,7 @@ export default function Onboarding() {
                 : 'bg-[#1b4332] text-[#c9e265] hover:bg-[#143528]'
             }`}
           >
-            {step === totalSteps ? 'Start Shopping' : step === 4 ? 'View Recommendations' : 'Continue'}
+            {step === totalSteps ? 'Start Shopping' : step === 4 ? 'Continue' : step === 5 ? 'View Package' : 'Continue'}
             <ArrowRight className="h-5 w-5" />
           </button>
         </div>

@@ -15,13 +15,7 @@ export default function AdminSupport() {
 
   useEffect(() => {
     fetchConversations()
-    
-    // Poll for new conversations every 30 seconds (reduced from 10)
-    const interval = setInterval(() => {
-      fetchConversations()
-    }, 30000)
-    
-    return () => clearInterval(interval)
+    // Removed auto-refresh for better performance
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showArchived])
 

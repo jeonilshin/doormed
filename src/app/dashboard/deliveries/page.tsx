@@ -50,13 +50,7 @@ export default function Deliveries() {
 
   useEffect(() => {
     fetchOrders()
-    
-    // Auto-refresh every 30 seconds (reduced from 10)
-    const interval = setInterval(() => {
-      fetchOrders()
-    }, 30000)
-    
-    return () => clearInterval(interval)
+    // Removed auto-refresh for better performance
   }, [])
 
   const fetchOrders = async () => {

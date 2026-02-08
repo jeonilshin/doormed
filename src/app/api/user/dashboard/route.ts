@@ -45,26 +45,23 @@ export async function GET(request: NextRequest) {
         orderBy: { nextDelivery: 'asc' }
       }),
       
-      // Get next delivery
-      prisma.delivery.findFirst({
+      // Get next delivery - look for active orders that haven't been delivered yet
+      prisma.order.findFirst({
         where: { 
           userId: user.id,
           status: {
-            in: ['pending', 'processing', 'packed', 'in_transit']
+            in: ['pending', 'confirmed', 'preparing', 'ready', 'rider_received', 'out_for_delivery', 'pending_confirmation']
           }
         },
         include: {
-          order: {
+          items: {
             include: {
-              items: {
-                include: {
-                  medication: true
-                }
-              }
+              medication: true
             }
-          }
+          },
+          delivery: true
         },
-        orderBy: { estimatedDate: 'asc' }
+        orderBy: { createdAt: 'desc' }
       })
     ])
 
@@ -74,8 +71,8 @@ export async function GET(request: NextRequest) {
       ? Math.round(userMedications.reduce((sum, med) => sum + med.adherence, 0) / userMedications.length)
       : 0
     
-    const daysUntilDelivery = nextDelivery
-      ? Math.ceil((new Date(nextDelivery.estimatedDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    const daysUntilDelivery = nextDelivery && nextDelivery.delivery
+      ? Math.ceil((new Date(nextDelivery.delivery.estimatedDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
       : null
 
     return NextResponse.json({
@@ -86,7 +83,10 @@ export async function GET(request: NextRequest) {
       },
       todaysMedications: userMedications,
       activeSubscriptions: subscriptions,
-      nextDelivery
+      nextDelivery: nextDelivery ? {
+        ...nextDelivery.delivery,
+        order: nextDelivery
+      } : null
     })
   } catch (error) {
     console.error('Get dashboard data error:', error)

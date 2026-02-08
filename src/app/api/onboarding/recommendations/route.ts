@@ -2,14 +2,54 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getUserFromToken } from '@/lib/auth'
 
-// AI-powered medication recommendations based on conditions
+// Medication recommendations by category (referenced from medicines.txt)
 const medicationRecommendations: Record<string, string[]> = {
-  'Hypertension': ['Lisinopril 10mg', 'Amlodipine 5mg', 'Losartan 50mg'],
-  'High Cholesterol': ['Atorvastatin 20mg', 'Simvastatin 40mg', 'Rosuvastatin 10mg'],
-  'Diabetes': ['Metformin 500mg', 'Glipizide 5mg', 'Insulin Glargine'],
-  'Heart Disease': ['Aspirin 81mg', 'Metoprolol 50mg', 'Clopidogrel 75mg'],
-  'Asthma': ['Albuterol Inhaler', 'Fluticasone Inhaler', 'Montelukast 10mg'],
-  'Arthritis': ['Ibuprofen 400mg', 'Naproxen 500mg', 'Celecoxib 200mg']
+  'Cholesterol Control': [
+    'Atorvastatin',
+    'Rosuvastatin',
+    'Simvastatin',
+    'Pravastatin',
+    'Lovastatin',
+    'Ezetimibe'
+  ],
+  'Blood Thinners': [
+    'Apixaban',
+    'Rivaroxaban',
+    'Dabigatran',
+    'Warfarin',
+    'Aspirin',
+    'Clopidogrel',
+    'Ticagrelor'
+  ],
+  'Diabetics': [
+    'Metformin',
+    'Empagliflozin',
+    'Dapagliflozin',
+    'Canagliflozin',
+    'Semaglutide',
+    'Dulaglutide',
+    'Liraglutide',
+    'Sitagliptin',
+    'Linagliptin'
+  ],
+  'Antihistamines': [
+    'Cetirizine',
+    'Loratadine',
+    'Fexofenadine',
+    'Desloratadine',
+    'Diphenhydramine',
+    'Chlorpheniramine'
+  ]
+}
+
+// Map health conditions to medicine categories
+const conditionToCategory: Record<string, string> = {
+  'Hypertension': 'Blood Thinners',
+  'High Cholesterol': 'Cholesterol Control',
+  'Diabetes': 'Diabetics',
+  'Heart Disease': 'Blood Thinners',
+  'Asthma': 'Antihistamines',
+  'Arthritis': 'Antihistamines'
 }
 
 // Supplement recommendations (PHP pricing)
@@ -36,72 +76,52 @@ async function generateRecommendations(token: string) {
     throw new Error('Health profile not found')
   }
 
+  // Get user's prescription medications if uploaded
+  const prescriptions = await prisma.prescription.findMany({
+    where: { userId: user.id },
+    orderBy: { createdAt: 'desc' }
+  })
+
   // Generate medication recommendations based on conditions
   const recommendedMedications: any[] = []
   const conditions = healthProfile.conditions || []
 
   for (const condition of conditions) {
-    const meds = medicationRecommendations[condition] || []
-    for (const medName of meds) {
-      // Check if medication exists in database
-      let medication = await prisma.medication.findFirst({
-        where: { name: { contains: medName.split(' ')[0] } }
-      })
-
-      // If not exists, create it (PHP pricing)
-      if (!medication) {
-        medication = await prisma.medication.create({
-          data: {
-            name: medName,
-            dosage: medName.split(' ').slice(1).join(' ') || '1 tablet',
-            category: condition,
-            price: Math.floor(Math.random() * 1500 + 1000), // Random price between ₱1000-₱2500
-            description: `Prescribed for ${condition}`,
-            requiresPrescription: true,
-            inStock: true
-          }
-        })
+    // Map condition to medicine category
+    const category = conditionToCategory[condition] || condition
+    const meds = medicationRecommendations[category] || []
+    
+    // Take first 2-3 medications from each category
+    for (const medName of meds.slice(0, 3)) {
+      // Create medication entry (NOT from inventory - these are for subscription tracking only)
+      const medicationData = {
+        id: `med-${medName.toLowerCase().replace(/\s+/g, '-')}`,
+        name: medName,
+        dosage: '1 tablet daily', // Default, will be customized in next step
+        price: Math.floor(Math.random() * 1500 + 1000), // Random price between ₱1000-₱2500
+        condition: condition,
+        requiresPrescription: true,
+        category: category,
+        frequency: 'once daily', // Default
+        times: ['8:00 AM'], // Default
+        instructions: 'Take with food' // Default
       }
 
-      recommendedMedications.push({
-        id: medication.id,
-        name: medication.name,
-        dosage: medication.dosage,
-        price: medication.price,
-        condition: condition,
-        requiresPrescription: medication.requiresPrescription
-      })
+      recommendedMedications.push(medicationData)
     }
   }
 
   // Add supplement recommendations
-  const recommendedSupplements = []
-  for (const supp of supplementRecommendations) {
-    let supplement = await prisma.medication.findFirst({
-      where: { name: supp.name }
-    })
-
-    if (!supplement) {
-      supplement = await prisma.medication.create({
-        data: {
-          name: supp.name,
-          dosage: '1 capsule daily',
-          category: supp.category,
-          price: supp.price,
-          description: `${supp.category} supplement`,
-          requiresPrescription: false,
-          inStock: true
-        }
-      })
-    }
-
-    recommendedSupplements.push({
-      id: supplement.id,
-      name: supplement.name,
-      price: supplement.price,
-      category: supp.category
-    })
-  }
+  const recommendedSupplements = supplementRecommendations.map(supp => ({
+    id: `supp-${supp.name.toLowerCase().replace(/\s+/g, '-')}`,
+    name: supp.name,
+    price: supp.price,
+    category: supp.category,
+    dosage: '1 capsule daily',
+    frequency: 'once daily',
+    times: ['8:00 AM'],
+    instructions: 'Take with meal'
+  }))
 
   // Calculate recommended subscription package
   const totalSupplements = Math.min(2, recommendedSupplements.length) // Recommend 2 supplements
@@ -114,20 +134,37 @@ async function generateRecommendations(token: string) {
     analysis: {
       conditions: conditions,
       riskLevel: conditions.length >= 3 ? 'high' : conditions.length >= 2 ? 'medium' : 'low',
-      recommendationCount: recommendedMedications.length + selectedSupplements.length
+      recommendationCount: recommendedMedications.length + selectedSupplements.length,
+      hasPrescription: prescriptions.length > 0
     },
     medications: recommendedMedications,
     supplements: selectedSupplements,
     package: {
-      name: 'Personalized Health Package',
-      description: `Custom package for ${conditions.join(', ')}`,
+      name: 'Personalized Medication Schedule & Dosing',
+      description: `Custom medication schedule for ${conditions.join(', ')}`,
       monthlyPrice: monthlyPrice,
       savings: Math.floor(monthlyPrice * 0.15), // 15% savings
       finalPrice: Math.floor(monthlyPrice * 0.85),
       frequency: 30, // days
       items: [
-        ...recommendedMedications.map(m => ({ id: m.id, name: m.name, type: 'medication' })),
-        ...selectedSupplements.map(s => ({ id: s.id, name: s.name, type: 'supplement' }))
+        ...recommendedMedications.map(m => ({ 
+          id: m.id, 
+          name: m.name, 
+          type: 'medication',
+          dosage: m.dosage,
+          frequency: m.frequency,
+          times: m.times,
+          instructions: m.instructions
+        })),
+        ...selectedSupplements.map(s => ({ 
+          id: s.id, 
+          name: s.name, 
+          type: 'supplement',
+          dosage: s.dosage,
+          frequency: s.frequency,
+          times: s.times,
+          instructions: s.instructions
+        }))
       ]
     }
   }
