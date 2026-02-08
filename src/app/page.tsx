@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 import Lenis from '@studio-freight/lenis'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
@@ -15,9 +16,13 @@ import {
 gsap.registerPlugin(ScrollTrigger)
 
 export default function Home() {
+  const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrollScale, setScrollScale] = useState(1)
   const [problemImageScale, setProblemImageScale] = useState(1.15)
+  const [statsImageParallax, setStatsImageParallax] = useState(0)
+  const [statsCounters, setStatsCounters] = useState({ stat1: 0, stat2: 0, stat3: 0 })
+  const [statsAnimated, setStatsAnimated] = useState(false)
   const [navVisible, setNavVisible] = useState(true)
   const [lastScrollY, setLastScrollY] = useState(0)
   const [handParallax, setHandParallax] = useState({ y: 0, x: 0, isSticky: false, isAbsoluteAtBottom: false })
@@ -26,6 +31,21 @@ export default function Home() {
   const [logoDriveOff, setLogoDriveOff] = useState(false)
   const horizontalRef = useRef<HTMLDivElement>(null)
   const cardsRef = useRef<HTMLDivElement>(null)
+
+  // Check if user is logged in and redirect to dashboard
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/me')
+        if (response.ok) {
+          router.push('/dashboard')
+        }
+      } catch (error) {
+        // User not logged in, stay on landing page
+      }
+    }
+    checkAuth()
+  }, [router])
 
   useEffect(() => {
     // Start logo drive-off animation after 1.5 seconds
@@ -124,6 +144,8 @@ export default function Home() {
     let targetHandX = 0
     let currentHandY = 0
     let currentHandX = 0
+    let targetStatsParallax = 0
+    let currentStatsParallax = 0
 
     const handleScroll = () => {
       const scrollY = window.scrollY
@@ -147,6 +169,25 @@ export default function Home() {
         const windowHeight = window.innerHeight
         const progress = Math.max(0, Math.min(1, (windowHeight - rect.top) / (windowHeight + rect.height * 0.5)))
         targetProblemScale = 1.15 - (progress * 0.15)
+      }
+      
+      // Stats section image parallax
+      const statsSection = document.getElementById('stats-section')
+      if (statsSection) {
+        const rect = statsSection.getBoundingClientRect()
+        const windowHeight = window.innerHeight
+        // Calculate parallax offset based on section position
+        if (rect.top < windowHeight && rect.bottom > 0) {
+          const sectionMiddle = rect.top + rect.height / 2
+          const viewportMiddle = windowHeight / 2
+          targetStatsParallax = (viewportMiddle - sectionMiddle) * 0.2
+          
+          // Trigger counter animation when section is in view
+          if (rect.top < windowHeight * 0.7 && !statsAnimated) {
+            setStatsAnimated(true)
+            animateCounters()
+          }
+        }
       }
       
       // Hand parallax effect - becomes sticky and stops at bottom of dark green section
@@ -186,8 +227,10 @@ export default function Home() {
       currentProblemScale += (targetProblemScale - currentProblemScale) * 0.025
       currentHandY += (targetHandY - currentHandY) * 0.03
       currentHandX += (targetHandX - currentHandX) * 0.03
+      currentStatsParallax += (targetStatsParallax - currentStatsParallax) * 0.08
       setScrollScale(currentScale)
       setProblemImageScale(currentProblemScale)
+      setStatsImageParallax(currentStatsParallax)
       setHandParallax(prev => ({ ...prev, y: currentHandY, x: currentHandX }))
       animationId = requestAnimationFrame(animate)
     }
@@ -199,7 +242,30 @@ export default function Home() {
       window.removeEventListener('scroll', handleScroll)
       cancelAnimationFrame(animationId)
     }
-  }, [lastScrollY])
+  }, [lastScrollY, statsAnimated])
+
+  // Animate counters from 0 to target values
+  const animateCounters = () => {
+    const duration = 2000 // 2 seconds
+    const steps = 60
+    const increment1 = 82 / steps
+    const increment2 = 75 / steps
+    const increment3 = 40 / steps
+    let currentStep = 0
+
+    const timer = setInterval(() => {
+      currentStep++
+      setStatsCounters({
+        stat1: Math.min(Math.round(increment1 * currentStep), 82),
+        stat2: Math.min(Math.round(increment2 * currentStep), 75),
+        stat3: Math.min(Math.round(increment3 * currentStep), 40),
+      })
+
+      if (currentStep >= steps) {
+        clearInterval(timer)
+      }
+    }, duration / steps)
+  }
 
   return (
     <div className="min-h-screen bg-[#f0f68d]">
@@ -223,37 +289,42 @@ export default function Home() {
         <div className="absolute inset-0 bg-[#f2f7e8] rounded-b-[80px] md:rounded-b-[150px]" style={{ height: 'calc(100% - 100px)' }}></div>
         
       {/* Navigation */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 py-6 px-6 md:px-12 lg:px-20 bg-[#f2f7e8] transition-transform duration-300 ease-in-out ${navVisible ? 'translate-y-0' : '-translate-y-full'}`}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <nav className={`fixed top-0 left-0 right-0 z-50 py-8 px-8 md:px-16 lg:px-24 bg-[#f2f7e8] transition-transform duration-300 ease-in-out ${navVisible ? 'translate-y-0' : '-translate-y-full'}`}>
+        <div className="flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
-            <img src="/medex.png" alt="DoorMed Express" className="h-10" />
+            <img src="/medex.png" alt="DoorMed Express" className="h-12 md:h-14" />
           </div>
 
           {/* Desktop Nav - Center pill */}
-          <div className="hidden md:flex items-center gap-6 bg-[#e4ecd8] rounded-full px-6 py-3">
-            <div className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition cursor-pointer text-sm">
+          <div className="hidden md:flex items-center gap-8 bg-[#e4ecd8] rounded-full px-8 py-4">
+            <div className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition cursor-pointer text-base">
               Solution <ChevronDown className="h-4 w-4" />
             </div>
-            <a href="#" className="text-gray-700 hover:text-gray-900 transition text-sm">For Patients</a>
-            <div className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition cursor-pointer text-sm">
+            <a href="#" className="text-gray-700 hover:text-gray-900 transition text-base">For Patients</a>
+            <div className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition cursor-pointer text-base">
               Partnerships <ChevronDown className="h-4 w-4" />
             </div>
-            <div className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition cursor-pointer text-sm">
+            <div className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition cursor-pointer text-base">
               Resources <ChevronDown className="h-4 w-4" />
             </div>
-            <div className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition cursor-pointer text-sm">
+            <div className="flex items-center gap-1 text-gray-700 hover:text-gray-900 transition cursor-pointer text-base">
               Contact Us <ChevronDown className="h-4 w-4" />
             </div>
           </div>
 
-          {/* Get Started Button */}
-          <button className="hidden md:flex items-center gap-3 bg-[#1b4332] text-[#c9e265] px-4 py-3 rounded-full text-sm font-medium hover:bg-[#143528] transition">
-            <div className="w-8 h-8 bg-[#c9e265]/20 rounded-full flex items-center justify-center flex-shrink-0">
-              <ArrowRight className="h-4 w-4" />
-            </div>
-            <span className="text-base">Get started</span>
-          </button>
+          {/* Auth Buttons */}
+          <div className="hidden md:flex items-center gap-3">
+            <a href="/login" className="px-6 py-3 text-[#1b4332] hover:bg-[#e4ecd8] rounded-full transition font-medium">
+              Sign In
+            </a>
+            <a href="/signup" className="flex items-center gap-3 bg-[#1b4332] text-[#c9e265] px-6 py-4 rounded-full text-base font-medium hover:bg-[#143528] transition">
+              <div className="w-10 h-10 bg-[#c9e265]/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <ArrowRight className="h-5 w-5" />
+              </div>
+              <span className="text-lg">Get started</span>
+            </a>
+          </div>
 
           {/* Mobile Menu Button */}
           <button 
@@ -282,50 +353,48 @@ export default function Home() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative px-6 md:px-12 lg:px-20 pt-28 md:pt-36 pb-12">
-        <div className="max-w-5xl mx-auto text-center">
+      <section className="relative px-6 md:px-12 lg:px-20 pt-40 md:pt-52 pb-16 md:pb-20">
+        <div className="max-w-6xl mx-auto text-center">
           {/* Main Heading */}
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif italic text-[#2d4a3e] leading-tight">
-            Your Health, Delivered.
-            <br />
-            Hassle-Free.
+          <h1 className="text-4xl md:text-6xl lg:text-7xl xl:text-8xl font-serif italic text-[#2d4a3e] leading-[1.1] md:leading-[1.05]">
+            Your Health, Delivered. Hassle-Free.
           </h1>
 
           {/* Subheading */}
-          <p className="mt-8 text-gray-600 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-10 md:mt-12 text-gray-600 text-lg md:text-xl lg:text-2xl max-w-3xl mx-auto leading-relaxed">
             Never forget to re-purchase your essential medications and supplements again. DoorMedExpress delivers your maintenance medications for chronic conditions and daily supplements directly to your door, automatically.
           </p>
 
           {/* Buttons */}
-          <div className="mt-10 flex flex-col md:flex-row justify-center gap-4 w-[50%] md:max-w-md mx-auto">
-            <button className="flex items-center gap-3 bg-[#1b4332] text-[#c9e265] px-4 py-2.5 rounded-full font-medium hover:bg-[#143528] transition">
-              <div className="w-8 h-8 bg-[#c9e265]/20 rounded-full flex items-center justify-center flex-shrink-0">
-                <ArrowRight className="h-4 w-4" />
+          <div className="mt-12 md:mt-16 flex flex-col md:flex-row justify-center gap-5 max-w-xl mx-auto">
+            <a href="/signup" className="flex items-center gap-4 bg-[#1b4332] text-[#c9e265] px-6 py-4 md:px-7 md:py-5 rounded-full font-medium hover:bg-[#143528] transition">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-[#c9e265]/20 rounded-full flex items-center justify-center flex-shrink-0">
+                <ArrowRight className="h-5 w-5 md:h-6 md:w-6" />
               </div>
-              <span className="text-base md:text-lg flex-1 text-left">Get started</span>
-            </button>
-            <button className="flex items-center gap-3 bg-[#e4ecd8] text-[#1b4332] px-4 py-2.5 rounded-full font-medium hover:bg-[#dce5d0] transition">
-              <div className="w-8 h-8 bg-[#1b4332] rounded-full flex items-center justify-center flex-shrink-0">
-                <Play className="h-4 w-4 text-[#c9e265] fill-[#c9e265]" />
+              <span className="text-lg md:text-xl flex-1 text-left">Get started</span>
+            </a>
+            <a href="/shop" className="flex items-center gap-4 bg-[#e4ecd8] text-[#1b4332] px-6 py-4 md:px-7 md:py-5 rounded-full font-medium hover:bg-[#dce5d0] transition">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-[#1b4332] rounded-full flex items-center justify-center flex-shrink-0">
+                <Play className="h-5 w-5 md:h-6 md:w-6 text-[#c9e265] fill-[#c9e265]" />
               </div>
-              <span className="text-base md:text-lg flex-1 text-left">Book a Demo</span>
-            </button>
+              <span className="text-lg md:text-xl flex-1 text-left">Browse Products</span>
+            </a>
           </div>
         </div>
       </section>
 
       {/* Hero Image */}
-      <section className="relative pb-20 mt-16">
-        <div className="relative px-6 md:px-12 lg:px-20">
-          <div className="max-w-4xl mx-auto">
+      <section className="relative pb-24 md:pb-32 mt-20 md:mt-24">
+        <div className="relative px-4 md:px-8 lg:px-12">
+          <div className="max-w-[95%] mx-auto">
             <div 
-              className="rounded-[40px] overflow-hidden transition-transform duration-300 ease-out"
+              className="rounded-[40px] md:rounded-[60px] overflow-hidden transition-transform duration-300 ease-out"
               style={{ transform: `scale(${scrollScale})` }}
             >
               <img 
                 src="/hero.jpg" 
                 alt="Healthcare Team" 
-                className="w-full h-[300px] md:h-[450px] object-cover object-top"
+                className="w-full h-[450px] md:h-[700px] lg:h-[850px] object-cover object-top"
               />
             </div>
           </div>
@@ -334,35 +403,35 @@ export default function Home() {
       </div>
 
       {/* Chartreuse Section - The Problem */}
-      <section id="problem-section" className="bg-[#f0f68d] py-24 md:py-32 px-6 md:px-12 lg:px-20">
+      <section id="problem-section" className="bg-[#f0f68d] py-32 md:py-40 px-6 md:px-12 lg:px-20">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 md:gap-20 items-center">
+          <div className="grid md:grid-cols-2 gap-16 md:gap-24 items-center">
             {/* Left Content */}
             <div>
-              <span className="inline-flex items-center gap-2 text-sm text-[#1b4332]/70 mb-6">
+              <span className="inline-flex items-center gap-2 text-base text-[#1b4332]/70 mb-8">
                 <span className="w-2 h-2 bg-[#1b4332]/50 rounded-full"></span>
                 The Problem
               </span>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif italic text-[#1b4332] leading-tight">
+              <h2 className="text-5xl md:text-6xl lg:text-7xl font-serif italic text-[#1b4332] leading-tight">
                 Forgetting to
                 <br />
                 Re-Purchase Your
                 <br />
                 Meds Shouldn&apos;t Happen
               </h2>
-              <p className="mt-8 text-[#1b4332]/70 text-lg leading-relaxed max-w-md">
+              <p className="mt-10 text-[#1b4332]/70 text-xl md:text-2xl leading-relaxed max-w-lg">
                 Managing chronic conditions like hypertension and high cholesterol requires consistency. Missing doses because you forgot to refill your prescription can impact your health. DoorMedExpress ensures you never run out.
               </p>
-              <button className="mt-8 flex items-center gap-3 bg-[#1b4332] text-[#c9e265] px-4 py-4 rounded-full font-medium hover:bg-[#143528] transition">
-                <div className="w-8 h-8 bg-[#c9e265]/20 rounded-full flex items-center justify-center flex-shrink-0">
-                  <ArrowRight className="h-4 w-4" />
+              <button className="mt-10 flex items-center gap-4 bg-[#1b4332] text-[#c9e265] px-6 py-5 rounded-full font-medium hover:bg-[#143528] transition">
+                <div className="w-10 h-10 bg-[#c9e265]/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <ArrowRight className="h-5 w-5" />
                 </div>
-                <span className="text-base md:text-lg">Get Started</span>
+                <span className="text-lg md:text-xl">Get Started</span>
               </button>
             </div>
 
             {/* Right Image */}
-            <div className="relative rounded-3xl overflow-hidden h-[400px] md:h-[500px]">
+            <div className="relative rounded-3xl overflow-hidden h-[500px] md:h-[600px] lg:h-[700px]">
               <img 
                 src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=800&q=80" 
                 alt="Healthcare professional" 
@@ -471,10 +540,10 @@ export default function Home() {
 
       {/* Key Features Section - Dark Green */}
       <section id="features-dark-section" className="bg-[#1b4332] py-24 md:py-32 px-6 md:px-12 lg:px-20 relative">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center">
+        <div className="max-w-[95%] mx-auto">
+          <div className="grid md:grid-cols-2 gap-16 md:gap-24 lg:gap-32 items-center">
             {/* Left - Features List - Centered on mobile */}
-            <div className="space-y-12 md:space-y-16 max-w-md mx-auto md:mx-0">
+            <div className="space-y-12 md:space-y-16 max-w-md mx-auto md:mx-0 md:ml-0">
               {/* Feature 1 */}
               <div className="text-center md:text-left border-b border-white/10 pb-8 md:border-0 md:pb-0">
                 <div className="w-10 h-10 bg-[#c9e265] rounded-lg flex items-center justify-center mb-4 mx-auto md:mx-0">
@@ -516,7 +585,7 @@ export default function Home() {
             </div>
 
             {/* Right - Video Placeholder Images - Hidden on mobile */}
-            <div className="hidden md:flex flex-col gap-6">
+            <div className="hidden md:flex flex-col gap-6 md:mr-0">
               <div className="rounded-3xl overflow-hidden h-[300px] bg-[#2d5a45]">
                 <img 
                   src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=800&q=80" 
@@ -736,62 +805,74 @@ export default function Home() {
       </section>
 
       {/* Statistics Section */}
-      <section className="bg-[#e9f9df] py-16 md:py-24 px-1 md:px-2">
-        <div className="max-w-[98%] mx-auto">
-          <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-            {/* Left - Heading Only */}
+      <section id="stats-section" className="bg-[#e9f9df] py-0 relative overflow-hidden">
+        <div className="relative h-[800px] md:h-[950px] lg:h-[1050px]">
+          {/* Background Image - Full Section with Parallax */}
+          <div 
+            className="absolute inset-0 w-full h-full"
+            style={{ 
+              transform: `translateY(${statsImageParallax * 0.3}px)`,
+              transition: 'transform 0.1s ease-out'
+            }}
+          >
+            <img 
+              src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800&q=80" 
+              alt="Healthcare professionals" 
+              className="w-full h-full object-cover scale-110"
+            />
+          </div>
+          
+          {/* Overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent"></div>
+          
+          {/* Content Container */}
+          <div className="relative h-full flex flex-col justify-between p-8 md:p-12 lg:p-16 max-w-[98%] mx-auto">
+            {/* Heading - Top Left */}
             <div>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-serif italic text-[#1b4332] leading-tight">
-                Why Customers
-                <br />
-                Trust DoorMedExpress
+              <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-serif italic text-[#1b4332] leading-tight max-w-2xl">
+                Why Customers Trust DoorMedExpress
               </h2>
             </div>
             
-            {/* Right - Image with Overlapping Stats */}
-            <div className="relative">
-              <div className="rounded-3xl overflow-hidden h-[400px] md:h-[500px]">
-                <img 
-                  src="https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=800&q=80" 
-                  alt="Healthcare professionals" 
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              
-              {/* Stat 1 - Top Left overlapping image */}
-              <div className="absolute -top-4 -left-8 bg-[#d4e857] rounded-2xl p-6 w-48 z-10">
-                <div className="text-5xl font-bold text-[#1b4332] mb-2">82<span className="text-3xl">%</span></div>
-                <p className="text-[#1b4332] text-sm leading-tight">
-                  Of patients say they are more engaged with their health using DoorMedExpress.
-                </p>
-              </div>
-              
-              {/* Stat 2 - Bottom Left overlapping image */}
-              <div className="absolute bottom-8 -left-8 bg-[#d4e857] rounded-2xl p-6 w-48 z-10">
-                <div className="text-5xl font-bold text-[#1b4332] mb-2">75<span className="text-3xl">%</span></div>
-                <p className="text-[#1b4332] text-sm leading-tight">
-                  Of patients say automated delivery improved their medication adherence.
-                </p>
-              </div>
-              
-              {/* Stat 3 - Bottom Center overlapping image */}
-              <div className="absolute bottom-8 left-1/3 bg-[#d4e857] rounded-2xl p-6 w-48 z-10">
-                <div className="text-5xl font-bold text-[#1b4332] mb-2">40<span className="text-3xl">%</span></div>
-                <p className="text-[#1b4332] text-sm leading-tight">
-                  Reduced medication gaps in patients with chronic conditions using our service.
-                </p>
-              </div>
-              
-              {/* Trust Badge */}
-              <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-2">
-                <div className="flex -space-x-1">
-                  <div className="w-4 h-4 bg-[#1b4332] rounded-full border border-white"></div>
-                  <div className="w-4 h-4 bg-[#2d5a45] rounded-full border border-white"></div>
-                  <div className="w-4 h-4 bg-[#d4e857] rounded-full border border-white"></div>
-                  <div className="w-4 h-4 bg-[#c9e265] rounded-full border border-white"></div>
+            {/* Stats Cards - Bottom Left - 1 on top, 2 on bottom */}
+            <div className="flex flex-col gap-5 max-w-3xl">
+              {/* First Row - Single Card */}
+              <div className="flex">
+                <div className="bg-[#d4e857] rounded-2xl p-8 md:p-10 lg:p-12 w-full md:w-80 lg:w-96">
+                  <div className="text-7xl md:text-8xl lg:text-9xl font-bold text-[#1b4332] mb-4">{statsCounters.stat1}<span className="text-5xl md:text-6xl">%</span></div>
+                  <p className="text-[#1b4332] text-base md:text-lg leading-tight">
+                    Of patients say they are more engaged with their health using DoorMedExpress.
+                  </p>
                 </div>
-                <span className="text-xs text-[#1b4332] font-medium">Millions of Transactions of Trust</span>
               </div>
+              
+              {/* Second Row - Two Cards */}
+              <div className="flex flex-col md:flex-row gap-5">
+                <div className="bg-[#d4e857] rounded-2xl p-8 md:p-10 lg:p-12 w-full md:w-80 lg:w-96">
+                  <div className="text-7xl md:text-8xl lg:text-9xl font-bold text-[#1b4332] mb-4">{statsCounters.stat2}<span className="text-5xl md:text-6xl">%</span></div>
+                  <p className="text-[#1b4332] text-base md:text-lg leading-tight">
+                    Of patients say automated delivery improved their medication adherence.
+                  </p>
+                </div>
+                
+                <div className="bg-[#d4e857] rounded-2xl p-8 md:p-10 lg:p-12 w-full md:w-80 lg:w-96">
+                  <div className="text-7xl md:text-8xl lg:text-9xl font-bold text-[#1b4332] mb-4">{statsCounters.stat3}<span className="text-5xl md:text-6xl">%</span></div>
+                  <p className="text-[#1b4332] text-base md:text-lg leading-tight">
+                    Reduced medication gaps in patients with chronic conditions using our service.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Trust Badge - Bottom Right */}
+            <div className="absolute bottom-8 right-8 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 flex items-center gap-2">
+              <div className="flex -space-x-1">
+                <div className="w-5 h-5 bg-[#1b4332] rounded-full border-2 border-white"></div>
+                <div className="w-5 h-5 bg-[#2d5a45] rounded-full border-2 border-white"></div>
+                <div className="w-5 h-5 bg-[#d4e857] rounded-full border-2 border-white"></div>
+                <div className="w-5 h-5 bg-[#c9e265] rounded-full border-2 border-white"></div>
+              </div>
+              <span className="text-xs md:text-sm text-[#1b4332] font-medium">Millions of Transactions of Trust</span>
             </div>
           </div>
         </div>

@@ -1,0 +1,304 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  password           String
+  firstName          String
+  lastName           String
+  phone              String?
+  dateOfBirth        DateTime?
+  gender             String?
+  role               String    @default("customer") // customer, admin
+  emailVerified      Boolean   @default(false)
+  verificationToken  String?
+  resetToken         String?
+  resetTokenExpiry   DateTime?
+  onboardingStep     Int       @default(0) // 0=not started, 1=health, 2=address, 3=prescription, 4=completed
+  onboardingComplete Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  // Relations
+  healthProfile   HealthProfile?
+  addresses       Address[]
+  medications     UserMedication[]
+  subscriptions   Subscription[]
+  orders          Order[]
+  deliveries      Delivery[]
+  familyMembers   FamilyMember[]
+  notifications   Notification[]
+  supportMessages SupportMessage[]
+  prescriptions   Prescription[]
+
+  @@map("users")
+}
+
+model HealthProfile {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conditions String[] // Array of conditions
+  allergies  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("health_profiles")
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  street    String
+  city      String
+  state     String
+  zipCode   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders     Order[]
+  deliveries Delivery[]
+
+  @@map("addresses")
+}
+
+model Medication {
+  id                   String    @id @default(cuid())
+  name                 String
+  dosage               String
+  category             String
+  price                Float
+  description          String
+  image                String?
+  requiresPrescription Boolean   @default(false)
+  inStock              Boolean   @default(true)
+  stockQuantity        Int       @default(0) // Inventory tracking
+  lowStockThreshold    Int       @default(10) // Alert when stock is low
+  sku                  String?   @unique // Stock keeping unit
+  manufacturer         String?
+  expiryDate           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // Relations
+  userMedications   UserMedication[]
+  subscriptionItems SubscriptionItem[]
+  orderItems        OrderItem[]
+
+  @@map("medications")
+}
+
+model UserMedication {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medicationId String
+  medication   Medication @relation(fields: [medicationId], references: [id])
+  dosage       String
+  frequency    String // "once daily", "twice daily", etc.
+  time         String[] // Array of times ["8:00 AM", "8:00 PM"]
+  instruction  String? // "with food", "before sleep"
+  status       String     @default("active") // active, paused
+  adherence    Int        @default(0) // percentage
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("user_medications")
+}
+
+model Subscription {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String
+  status       String   @default("active") // active, paused, cancelled
+  frequency    Int // days between deliveries
+  nextDelivery DateTime
+  price        Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  items SubscriptionItem[]
+
+  @@map("subscriptions")
+}
+
+model SubscriptionItem {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  medicationId   String
+  medication     Medication   @relation(fields: [medicationId], references: [id])
+  quantity       Int          @default(1)
+  createdAt      DateTime     @default(now())
+
+  @@map("subscription_items")
+}
+
+model Order {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  addressId       String
+  address         Address   @relation(fields: [addressId], references: [id])
+  riderId         String? // Assigned rider
+  rider           Rider?    @relation(fields: [riderId], references: [id])
+  status          String    @default("pending") // pending, confirmed, preparing, ready, rider_received, out_for_delivery, pending_confirmation, delivered, cancelled
+  subtotal        Float
+  tax             Float
+  shipping        Float     @default(0)
+  total           Float
+  paymentMethod   String? // credit_card, gcash, cod
+  paymentId       String?
+  deliveryPhoto   String? // Cloudinary URL of delivery photo
+  archived        Boolean   @default(false) // Archive completed/cancelled orders
+  confirmedAt     DateTime? // When admin confirmed
+  preparingAt     DateTime? // When started preparing
+  readyAt         DateTime? // When ready for delivery
+  riderReceivedAt DateTime? // When rider received the order
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  items    OrderItem[]
+  delivery Delivery?
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String     @id @default(cuid())
+  orderId      String
+  order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  medicationId String
+  medication   Medication @relation(fields: [medicationId], references: [id])
+  quantity     Int
+  price        Float
+  createdAt    DateTime   @default(now())
+
+  @@map("order_items")
+}
+
+model Delivery {
+  id             String    @id @default(cuid())
+  orderId        String    @unique
+  order          Order     @relation(fields: [orderId], references: [id])
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  addressId      String
+  address        Address   @relation(fields: [addressId], references: [id])
+  status         String    @default("pending") // pending, processing, packed, in_transit, delivered
+  estimatedDate  DateTime
+  deliveredAt    DateTime?
+  driverName     String?
+  trackingNumber String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("deliveries")
+}
+
+model FamilyMember {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email        String
+  name         String
+  relationship String
+  accessLevel  String // view_only, limited, full_access
+  status       String   @default("pending") // pending, active
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("family_members")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // order_confirmed, order_ready, rider_assigned, out_for_delivery, delivered
+  title     String
+  message   String
+  orderId   String?  // Link to order
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model SupportMessage {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId String
+  sender         String // user, support
+  message        String
+  archived       Boolean  @default(false) // Admin can archive conversations
+  createdAt      DateTime @default(now())
+
+  @@map("support_messages")
+}
+
+model Prescription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName  String
+  fileUrl   String
+  status    String   @default("pending") // pending, approved, rejected
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("prescriptions")
+}
+
+model PaymentMethod {
+  id               String   @id @default(cuid())
+  userId           String
+  stripeCustomerId String?
+  cardLast4        String
+  cardBrand        String
+  expiryMonth      Int
+  expiryYear       Int
+  isDefault        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("payment_methods")
+}
+
+model Rider {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone         String
+  vehicleType   String // motorcycle, car, bicycle
+  vehiclePlate  String? // Vehicle plate number
+  licenseNumber String?
+  status        String   @default("active") // active, inactive
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  orders Order[]
+
+  @@map("riders")
+}
