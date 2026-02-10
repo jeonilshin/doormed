@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CheckCircle2, Package, Calendar, Home } from 'lucide-react'
 
-export default function OrderConfirmation() {
+function OrderConfirmationContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('orderId')
   const subscriptionId = searchParams.get('subscriptionId')
@@ -117,5 +117,20 @@ export default function OrderConfirmation() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function OrderConfirmation() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#f2f7e8] flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#1b4332] mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <OrderConfirmationContent />
+    </Suspense>
   )
 }
