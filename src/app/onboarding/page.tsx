@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { 
   ArrowRight, 
   ArrowLeft,
@@ -15,7 +15,7 @@ import {
 import { useSearchParams } from 'next/navigation'
 import { philippineProvinces, getCitiesByProvince, getBarangaysByCity } from '@/lib/ph-locations'
 
-export default function Onboarding() {
+function OnboardingContent() {
   const searchParams = useSearchParams()
   const initialStep = parseInt(searchParams.get('step') || '1')
   const [step, setStep] = useState(initialStep)
@@ -1020,5 +1020,20 @@ export default function Onboarding() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function Onboarding() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#f2f7e8] flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-200 border-t-[#1b4332] mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <OnboardingContent />
+    </Suspense>
   )
 }
